@@ -108,6 +108,9 @@ type kubeAuthBackend struct {
 	// tlsConfigUpdaterRunning is used to signal the current state of the tlsConfig updater routine.
 	tlsConfigUpdaterRunning bool
 
+	// ignoreAudienceValidation is used to ask k8s to ignore audience validation
+	ignoreAudienceValidation bool
+
 	// tlsConfigUpdateCancelFunc should be called in the backend's Clean(), set in initialize().
 	tlsConfigUpdateCancelFunc context.CancelFunc
 
@@ -117,15 +120,17 @@ type kubeAuthBackend struct {
 	tlsMu sync.RWMutex
 }
 
-// Factory returns a new backend as logical.Backend.
-func Factory(ctx context.Context, conf *logical.BackendConfig) (logical.Backend, error) {
-	b := Backend()
+// FactoryFunc returns a creator for new backend as logical.Backend.
+func FactoryFunc(ignoreAudienceValidation bool) logical.Factory {
+	return func(ctx context.Context, config *logical.BackendConfig) (logical.Backend, error) {
+		b := Backend(ignoreAudienceValidation)
 
-	if err := b.Setup(ctx, conf); err != nil {
-		return nil, err
+		if err := b.Setup(ctx, config); err != nil {
+			return nil, err
+		}
+
+		return b, nil
 	}
-
-	return b, nil
 }
 
 // getDefaultTLSConfig returns a http.Client with the supported, default
@@ -145,7 +150,7 @@ func getDefaultTLSConfig() *tls.Config {
 	}
 }
 
-func Backend() *kubeAuthBackend {
+func Backend(ignoreAudienceValidation bool) *kubeAuthBackend {
 	b := &kubeAuthBackend{
 		localSATokenReader: newCachingFileReader(localJWTPath, jwtReloadPeriod, time.Now),
 		localCACertReader:  newCachingFileReader(localCACertPath, caReloadPeriod, time.Now),
@@ -157,6 +162,7 @@ func Backend() *kubeAuthBackend {
 		reviewFactory:               tokenReviewAPIFactory,
 		namespaceValidatorFactory:   newNsValidatorWrapper,
 		serviceAccountGetterFactory: newServiceAccountGetterWrapper,
+		ignoreAudienceValidation:    ignoreAudienceValidation,
 	}
 
 	b.Backend = &framework.Backend{

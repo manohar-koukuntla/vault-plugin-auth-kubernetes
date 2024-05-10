@@ -44,7 +44,7 @@ const (
 func getBackend(t *testing.T) (logical.Backend, logical.Storage) {
 	defaultLeaseTTLVal := time.Hour * 12
 	maxLeaseTTLVal := time.Hour * 24
-	b := Backend()
+	b := Backend(false)
 	if err := b.validateHTTPClientInit(); err != nil {
 		t.Fatalf("unable to create backend: %v", err)
 	}

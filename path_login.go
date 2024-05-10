@@ -158,11 +158,13 @@ func (b *kubeAuthBackend) pathLogin(ctx context.Context, req *logical.Request, d
 		return nil, err
 	}
 
-	// look up the JWT token in the kubernetes API
-	err = sa.lookup(ctx, client, jwtStr, role.Audience, b.reviewFactory(config))
-	if err != nil {
-		b.Logger().Debug(`login unauthorized`, "err", err)
-		return nil, logical.ErrPermissionDenied
+	if !b.ignoreAudienceValidation {
+		// look up the JWT token in the kubernetes API
+		err = sa.lookup(ctx, client, jwtStr, role.Audience, b.reviewFactory(config))
+		if err != nil {
+			b.Logger().Debug(`login unauthorized`, "err", err)
+			return nil, logical.ErrPermissionDenied
+		}
 	}
 
 	annotations := map[string]string{}
@@ -322,7 +324,7 @@ func (b *kubeAuthBackend) parseAndValidateJWT(ctx context.Context, client *http.
 		SigningAlgorithms: supportedJwtAlgs,
 	}
 
-	// perform ISS Claim validation if configured
+	// perform ISS Claim validation if configured–
 	if !config.DisableISSValidation {
 		// set the expected issuer to the default kubernetes issuer if the config doesn't specify it
 		if config.Issuer != "" {
